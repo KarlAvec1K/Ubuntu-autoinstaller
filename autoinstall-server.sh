@@ -64,10 +64,19 @@ echo
 read -p "Hostname: " HOSTNAME
 read -p "Autoinstall Config File Path (relative to $WORK_DIR): " CONFIG_PATH
 
-# Prompt for USB device
-echo "[🔍] Please select the USB device to write the modified ISO to:"
-lsblk -o NAME,SIZE,TYPE,MOUNTPOINT | grep -w "disk"
-read -p "Enter USB device (e.g., /dev/sdX): " USB_DEVICE
+# List USB devices and prompt for selection
+echo "[🔍] Available USB devices:"
+USB_DEVICES=$(lsblk -o NAME,SIZE,TYPE,MOUNTPOINT | grep -w "disk" | awk '{print $1, $2}')
+echo "$USB_DEVICES"
+
+# Extract device IDs
+DEVICE_IDS=$(echo "$USB_DEVICES" | awk '{print $1}')
+echo
+echo "[🔍] Please enter the ID of the USB device to write the modified ISO to (e.g., sdb):"
+read -p "Enter USB device ID: " USB_ID
+
+# Construct full device path
+USB_DEVICE="/dev/$USB_ID"
 
 # Validate USB device
 if [ ! -b "$USB_DEVICE" ]; then
@@ -86,7 +95,6 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 # Modify autoinstall configuration
-echo "[🔄] Modifying autoinstall configuration..."
 mkdir -p "$(dirname "$AUTOINSTALL_CONFIG")"
 cat > "$AUTOINSTALL_CONFIG" << EOF
 #cloud-config
