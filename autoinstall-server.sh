@@ -8,6 +8,9 @@ ISO_NAME="focal-live-server-amd64+intel-iot.iso"
 ISO_MOUNT="/mnt"
 WORK_DIR="ubuntu-autoinstall-work"
 MODIFIED_ISO="ubuntu-20.04-autoinstall.iso"
+AUTO_INSTALL_DIR="autoinstall-server"
+SERVER_DIR="$AUTO_INSTALL_DIR/server"
+SCRIPT="$0"  # This script itself
 
 # Function to display spinner
 spinner() {
@@ -26,6 +29,55 @@ spinner() {
 
 # Start script
 echo "[👶] Starting up..."
+
+# Create autoinstall-server and server directories
+echo "[📂] Creating directories..."
+mkdir -p "$AUTO_INSTALL_DIR"
+mkdir -p "$SERVER_DIR"
+
+# Create user-data and meta-data files
+echo "[📝] Creating user-data and meta-data files..."
+touch "$SERVER_DIR/user-data"
+touch "$SERVER_DIR/meta-data"
+
+# Ask user for username and password
+echo "[👤] Enter the username for the new account:"
+read -r USERNAME
+
+echo "[🔐] Enter password for the user '$USERNAME':"
+read -s PASSWORD
+
+# Generate hashed password
+PASSWORD_HASH=$(openssl passwd -6 -stdin <<< "$PASSWORD")
+
+# Write user-data content with chosen username
+cat <<EOF > "$SERVER_DIR/user-data"
+#cloud-config
+autoinstall:
+  version: 1
+  identity:
+    hostname: ubuntu-server
+    password: $PASSWORD_HASH
+    username: $USERNAME
+  keyboard:
+    layout: en
+    toggle: null
+    variant: ''
+  locale: en_EN.UTF-8
+  ssh:
+    allow-pw: true
+    install-server: true
+  packages:
+    - build-essential
+    - network-manager
+EOF
+
+# Ensure the script has execute permission
+chmod +x "$SCRIPT"
+
+# Run the script
+echo "[🚀] Executing the script..."
+"$SCRIPT"
 
 # Download ISO
 echo "[📥] Downloading ISO from $ISO_URL..."
@@ -59,4 +111,39 @@ if [ "$delete_dir" = "y" ]; then
     rm -rf "$WORK_DIR"
 fi
 
-echo "[✔️] Done. Modified ISO created as '$MODIFIED_ISO'."
+# USB Installation
+echo "[🔌] Please plug in your USB drive and press Enter..."
+read -r
+
+# List USB devices
+echo "[📋] Listing USB devices..."
+lsblk
+
+# Ask user for USB device
+echo "[💾] Enter the device ID of your USB drive (e.g., sdb):"
+read -r DEVICE_ID
+
+# Confirm and warn user
+echo "[⚠️] WARNING: This action will erase all data on /dev/$DEVICE_ID. Do you want to proceed? [yes/no/exit]:"
+read -r proceed
+
+case "$proceed" in
+    yes)
+        echo "[📝] Writing ISO to /dev/$DEVICE_ID..."
+        sudo dd if="$MODIFIED_ISO" of="/dev/$DEVICE_ID" bs=1024k status=progress && sync
+        ;;
+    no)
+        echo "[🔄] Please run the script again and select the correct device."
+        exit 1
+        ;;
+    exit)
+        echo "[🚪] Exiting script."
+        exit 0
+        ;;
+    *)
+        echo "[❓] Invalid option. Exiting."
+        exit 1
+        ;;
+esac
+
+echo "[✔️] Done. The ISO has been written to /dev/$DEVICE_ID."
