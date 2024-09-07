@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -e
-set -x  # Enable debugging output
+# set -x  # Enable debugging output
 
 # Variables
 ISO_URL="https://cdimage.ubuntu.com/ubuntu-server/focal/daily-live/current/focal-live-server-amd64+intel-iot.iso"
