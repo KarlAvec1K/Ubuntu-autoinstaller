@@ -77,7 +77,8 @@ get_usb_device() {
 }
 
 # Start script
-echo "888    d8P                   888        d8888                             d888   888    d8P  
+cat << "EOF"
+888    d8P                   888        d8888                             d888   888    d8P  
 888   d8P                    888       d88888                            d8888   888   d8P   
 888  d8P                     888      d88P888                              888   888  d8P    
 888d88K      8888b.  888d888 888     d88P 888 888  888  .d88b.   .d8888b   888   888d88K     
@@ -88,7 +89,8 @@ echo "888    d8P                   888        d8888                             
                                                                                              
                                                                                              
                                                                                              
-"
+EOF
+echo "[👶] Starting up..."
 echo "[👶] Starting up..."
 
 # Download ISO
