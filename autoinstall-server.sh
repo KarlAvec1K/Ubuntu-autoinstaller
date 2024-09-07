@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -e
-# set -x  # Enable debugging output
 
 # Variables
 ISO_URL="https://cdimage.ubuntu.com/ubuntu-server/focal/daily-live/current/focal-live-server-amd64+intel-iot.iso"
@@ -9,10 +8,7 @@ ISO_NAME="focal-live-server-amd64+intel-iot.iso"
 ISO_MOUNT="/mnt"
 WORK_DIR="ubuntu-autoinstall-work"
 MODIFIED_ISO="ubuntu-20.04-autoinstall.iso"
-AUTOINSTALL_DIR="autoinstall-server"
-SERVER_DIR="$AUTOINSTALL_DIR/server"
-USER_DATA="$SERVER_DIR/user-data"
-META_DATA="$SERVER_DIR/meta-data"
+AUTOINSTALL_CONFIG="$WORK_DIR/auto-install/user-data"
 
 # Function to display spinner
 spinner() {
@@ -29,6 +25,21 @@ spinner() {
     printf "    \b\b\b\b"
 }
 
+# Display ASCII Logo
+echo "
+888    d8P                   888        d8888                             d888   888    d8P  
+888   d8P                    888       d88888                            d8888   888   d8P   
+888  d8P                     888      d88P888                              888   888  d8P    
+888d88K      8888b.  888d888 888     d88P 888 888  888  .d88b.   .d8888b   888   888d88K     
+8888888b        \"88b 888P\"   888    d88P  888 888  888 d8P  Y8b d88P\"      888   8888888b    
+888  Y88b   .d888888 888     888   d88P   888 Y88  88P 88888888 888        888   888  Y88b   
+888   Y88b  888  888 888     888  d8888888888  Y8bd8P  Y8b.     Y88b.      888   888   Y88b  
+888    Y88b \"Y888888 888     888 d88P     888   Y88P    \"Y8888   \"Y8888P 8888888 888    Y88b 
+                                                                                             
+                                                                                             
+                                                                                             
+"
+
 # Start script
 echo "[👶] Starting up..."
 
@@ -36,7 +47,6 @@ echo "[👶] Starting up..."
 echo "[📥] Downloading ISO from $ISO_URL..."
 curl -L -o "$ISO_NAME" "$ISO_URL" &
 spinner
-echo "[📥] ISO download complete."
 
 # Create working directory
 echo "[🔧] Creating working directory..."
@@ -44,53 +54,64 @@ mkdir -p "$WORK_DIR"
 sudo mount -o loop "$ISO_NAME" "$ISO_MOUNT"
 rsync -a "$ISO_MOUNT/" "$WORK_DIR/"
 sudo umount "$ISO_MOUNT"
-echo "[🔧] Working directory setup complete."
-
-# Create autoinstall-server directory and files
-echo "[🗂️] Creating autoinstall-server directory and files..."
-mkdir -p "$SERVER_DIR"
-touch "$USER_DATA" "$META_DATA"
 
 # Prompt for user input
-read -p "Enter the desired username: " USERNAME
-echo "Enter password for user $USERNAME:"
-read -s PASSWORD
-HASHED_PASSWORD=$(openssl passwd -6 -stdin <<< "$PASSWORD")
+echo "[📝] Please enter the following details for autoinstall configuration:"
 
-# Write user-data and meta-data files
-echo "#cloud-config
+read -p "Username: " USERNAME
+read -sp "Password: " PASSWORD
+echo
+read -p "Hostname: " HOSTNAME
+read -p "Autoinstall Config File Path (relative to $WORK_DIR): " CONFIG_PATH
+
+# Prompt for USB device
+echo "[🔍] Please select the USB device to write the modified ISO to:"
+lsblk -o NAME,SIZE,TYPE,MOUNTPOINT | grep -w "disk"
+read -p "Enter USB device (e.g., /dev/sdX): " USB_DEVICE
+
+# Validate USB device
+if [ ! -b "$USB_DEVICE" ]; then
+    echo "[❌] USB device $USB_DEVICE not found."
+    exit 1
+fi
+
+# Create autoinstall configuration
+echo "[🛠️] Creating autoinstall configuration..."
+
+# Ensure the file exists
+CONFIG_FILE="$WORK_DIR/$CONFIG_PATH"
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "[❌] Configuration file not found at $CONFIG_FILE"
+    exit 1
+fi
+
+# Modify autoinstall configuration
+echo "[🔄] Modifying autoinstall configuration..."
+mkdir -p "$(dirname "$AUTOINSTALL_CONFIG")"
+cat > "$AUTOINSTALL_CONFIG" << EOF
+#cloud-config
 autoinstall:
   version: 1
   identity:
-    hostname: ubuntu-server
-    password: $HASHED_PASSWORD
+    hostname: $HOSTNAME
     username: $USERNAME
-  keyboard:
-    layout: en
-    toggle: null
-    variant: ''
-  locale: en_EN.UTF-8
-  ssh:
-    allow-pw: true
-    install-server: true
-  packages:
-    - build-essential
-    - network-manager" > "$USER_DATA"
-
-echo "meta-data: {}" > "$META_DATA"
-echo "[🗂️] User data and meta data files created."
+    password: $PASSWORD
+EOF
 
 # Modify ISO
 echo "[🛠️] Modifying ISO..."
-# Example modification, replace with actual commands
-sed -i 's/old/new/g' "$WORK_DIR/path/to/file" || { echo "Error modifying ISO"; exit 1; }
-echo "[🛠️] ISO modification complete."
+# Replace old/new with appropriate modifications if needed
+sed -i 's/old/new/g' "$CONFIG_FILE" || { echo "Error modifying ISO"; exit 1; }
 
 # Create modified ISO
 echo "[💾] Creating modified ISO..."
 mkisofs -r -V "Custom Ubuntu ISO" -cache-inodes -J -l -o "$MODIFIED_ISO" "$WORK_DIR" &
 spinner
-echo "[💾] Modified ISO creation complete."
+
+# Write modified ISO to USB
+echo "[💾] Writing modified ISO to USB device $USB_DEVICE..."
+sudo dd if="$MODIFIED_ISO" of="$USB_DEVICE" bs=4M status=progress
+sync
 
 # Cleanup
 echo "[❓] Do you want to delete the working directory '$WORK_DIR'? [y/n]: "
@@ -100,28 +121,4 @@ if [ "$delete_dir" = "y" ]; then
     rm -rf "$WORK_DIR"
 fi
 
-echo "[✔️] Done. Modified ISO created as '$MODIFIED_ISO'."
-
-# Prompt user to insert USB and select device
-echo "[💾] Please plug in your USB key and press Enter to continue."
-read -r
-echo "[💾] Listing available USB devices..."
-lsblk
-echo "[💾] Enter the device ID of your USB key (e.g., sdb):"
-read -r usb_device
-echo "You selected /dev/$usb_device. This action will erase all data on the USB device. Are you sure you want to proceed? Type 'yes' to confirm or 'no' to select a different device or exit."
-read -r confirmation
-
-if [ "$confirmation" = "yes" ]; then
-    echo "[💾] Writing ISO to USB device..."
-    sudo dd if="$MODIFIED_ISO" of="/dev/$usb_device" bs=1024k status=progress && sync
-    echo "[💾] USB device write complete."
-elif [ "$confirmation" = "no" ]; then
-    echo "[❓] Please re-select your USB device."
-    # You might want to add code here to allow the user to re-enter the device ID or exit.
-else
-    echo "[❌] Exiting."
-    exit 1
-fi
-
-echo "[✔️] Script execution complete."
+echo "[✔️] Done. Modified ISO created and written to '$USB_DEVICE'."
