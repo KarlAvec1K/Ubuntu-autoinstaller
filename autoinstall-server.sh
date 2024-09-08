@@ -8,7 +8,11 @@ ISO_NAME="focal-live-server-amd64+intel-iot.iso"
 ISO_MOUNT="/mnt"
 WORK_DIR="ubuntu-autoinstall-work"
 MODIFIED_ISO="ubuntu-20.04-autoinstall.iso"
-USER_DATA_FILE="$WORK_DIR/user-data"
+USB_DEVICE=""
+USERNAME=""
+PASSWORD=""
+HOSTNAME=""
+SSH_KEY=""
 
 # Function to display spinner
 spinner() {
@@ -25,73 +29,56 @@ spinner() {
     printf "    \b\b\b\b"
 }
 
-# Function to create the user-data file
+# Function to create user-data
 create_user_data() {
-    echo "[📝] Creating autoinstall configuration..."
-    cat <<EOF > "$USER_DATA_FILE"
+    cat <<EOF > "$WORK_DIR/user-data"
 #cloud-config
 autoinstall:
   version: 1
-  identity:
-    hostname: $HOSTNAME
-    username: $USERNAME
-    password: $(echo -n "$PASSWORD" | openssl passwd -6 -stdin)
-  keyboard:
-    layout: us
-    variant: ''
-  locale: en_US
+  ssh:
+    install-server: yes
+    authorized-keys:
+      - $SSH_KEY
   packages:
     - vim
-    - git
-  storage:
-    layout:
-      name: lvm
-      swap:
-        size: 4096
-  network:
-    ethernets:
-      eth0:
-        dhcp4: true
-    version: 2
+    - htop
   user-data:
-    disable_root: false
-    ssh:
-      authorized-keys:
-        - ssh-rsa $SSH_KEY
+    username: $USERNAME
+    password: $PASSWORD
+    hostname: $HOSTNAME
 EOF
 }
 
 # Function to get USB device
 get_usb_device() {
     echo "[🔍] Please select the USB device to write the modified ISO to:"
-    lsblk -d | grep -v 'loop\|zram' | awk '{print $1 " " $4 " " $6}' | while read -r dev size type; do
-        echo "${dev} ${size} ${type}"
-    done
+    lsblk -o NAME,SIZE,MOUNTPOINT,LABEL
     echo -n "Enter USB device (e.g., /dev/sdX): "
-    read -r USB_DEVICE_ID
-    USB_DEVICE="/dev/${USB_DEVICE_ID}"
+    read -r USB_ID
+    USB_DEVICE="/dev/$USB_ID"
     if [ ! -b "$USB_DEVICE" ]; then
         echo "[❌] USB device $USB_DEVICE not found."
         exit 1
     fi
 }
 
-# ASCII LOGO
-cat << "EOF"
+# Start script
+echo "[👶] Starting up..."
+
+# Display ASCII logo
+cat <<'EOF'
  888    d8P                   888        d8888                             d888   888    d8P  
- 888   d8P                    888       d88888                            d8888   888   d8P  
- 888  d8P                     888      d88P888                              888   888  d8P   
- 888d88K      8888b.  888d888 888     d88P 888 888  888  .d88b.   .d8888b   888   888d88K    
- 8888888b        88b 888P"   888    d88P  888 888  888 d8P  Y8b d88P"      888   8888888b  
- 888  Y88b   .d888888 888     888   d88P   888 Y88  88P 88888888 888        888   888  Y88b  
+ 888   d8P                    888       d88888                            d8888   888   d8P   
+ 888  d8P                     888      d88P888                              888   888  d8P    
+ 888d88K      8888b.  888d888 888     d88P 888 888  888  .d88b.   .d8888b   888   888d88K     
+ 8888888b        88b 888P"   888    d88P  888 888  888 d8P  Y8b d88P"      888   8888888b    
+ 888  Y88b   .d888888 888     888   d88P   888 Y88  88P 88888888 888        888   888  Y88b   
  888   Y88b  888  888 888     888  d8888888888  Y8bd8P  Y8b.     Y88b.      888   888   Y88b  
  888    Y88b "Y888888 888     888 d88P     888   Y88P    "Y8888   "Y8888P 8888888 888    Y88b 
                                                                                              
                                                                                              
 https://github.com/KarlAvec1K
-EOF                                                                                       
-# Start script
-echo "[👶] Starting up..."
+EOF
 
 # Download ISO
 echo "[📥] Downloading ISO from $ISO_URL..."
