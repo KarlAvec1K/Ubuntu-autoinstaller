@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # ASCII logo
-echo "                                                                                             
+cat << "EOF"
+                                                                                             
  888    d8P                   888        d8888                             d888   888    d8P 
  888   d8P                    888       d88888                            d8888   888   d8P  
  888  d8P                     888      d88P888                              888   888  d8P   
@@ -12,7 +13,8 @@ echo "
  888    Y88b Y888888 888 888 d88P 888 Y88P Y8888   Y8888P 8888888 888 Y88b
                                                                                              
                                                                                              
-https://github.com/KarlAvec1K"
+https://github.com/KarlAvec1K
+EOF
 
 # Start script
 echo "[👶] Starting up..."
