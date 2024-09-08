@@ -1,92 +1,53 @@
 #!/bin/bash
 
-# Define variables
-ISO_URL="https://cdimage.ubuntu.com/ubuntu-server/focal/daily-live/current/focal-live-server-amd64+intel-iot.iso"
-ISO_NAME="focal-live-server-amd64+intel-iot.iso"
-WORK_DIR="/mnt/ubuntu-autoinstall-work"
-ISO_MOUNT="/mnt/iso"
-MODIFIED_ISO="modified-ubuntu.iso"
-USB_DEVICE=""
-DOWNLOAD_DIR="/path/to/downloads"
-
-# Function to create user data
-create_user_data() {
-    cat <<EOF > "$WORK_DIR/user-data"
-#cloud-config
-hostname: $HOSTNAME
-manage_etc_hosts: true
-users:
-  - name: $USERNAME
-    sudo: ['ALL=(ALL) NOPASSWD:ALL']
-    shell: /bin/bash
-    plain_text_passwd: $PASSWORD
-    lock_passwd: false
-    ssh_authorized_keys:
-      - $SSH_KEY
-EOF
-}
-
-# Function to get USB device
-get_usb_device() {
-    echo "[🔍] Please select the USB device to write the modified ISO to:"
-    lsblk -o NAME,SIZE,TYPE,MOUNTPOINT | grep disk
-    echo -n "Enter USB device (e.g., /dev/sdX): "
-    read -r USB_DEVICE
-    USB_DEVICE="/dev/$USB_DEVICE"
-    if ! lsblk | grep -q "$USB_DEVICE"; then
-        echo "[❌] USB device $USB_DEVICE not found."
-        exit 1
-    fi
-}
-
-# Function to show spinner while waiting
-spinner() {
-    local pid=$!
-    local spin='-\|/'
-    local i=0
-    while [ -d /proc/$pid ]; do
-        i=$(( (i+1) %4 ))
-        printf "\r${spin:$i:1}"
-        sleep .1
-    done
-    printf " done.\n"
-}
-
-# Function to handle error
-handle_error() {
-    echo "[❌] Error modifying ISO"
-    exit 1
-}
-
-# Ensure aria2 is installed
-if ! command -v aria2c &> /dev/null; then
-    echo "aria2 is not installed. Installing aria2..."
-    sudo apt update && sudo apt install -y aria2
-fi
-
-# Create download directory if it doesn't exist
-mkdir -p "$DOWNLOAD_DIR"
-
-# Configure Cloudflare DNS temporarily
-echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf > /dev/null
-echo "nameserver 1.0.0.1" | sudo tee -a /etc/resolv.conf > /dev/null
-
-# Download ISO with aria2
-echo "[📥] Downloading ISO from $ISO_URL..."
-aria2c -x 16 -s 16 -d "$DOWNLOAD_DIR" -o "$ISO_NAME" "$ISO_URL"
-echo "[✔️] Download completed: $DOWNLOAD_DIR/$ISO_NAME"
-
-# Restore original DNS settings if needed
-# Uncomment the following lines if you have a backup of the original /etc/resolv.conf
-# sudo mv /etc/resolv.conf.bak /etc/resolv.conf
+# ASCII logo
+echo "                                                                                             
+ 888    d8P                   888        d8888                             d888   888    d8P 
+ 888   d8P                    888       d88888                            d8888   888   d8P  
+ 888  d8P                     888      d88P888                              888   888  d8P   
+ 888d88K      8888b.  888d888 888     d88P 888 888  888  .d88b.   .d8888b   888   888d88K    
+ 8888888b        88b 888P   888    d88P  888 888  888 d8P  Y8b d88P 888 8888888b  
+ 888  Y88b   .d888888 888     888   d88P   888 Y88  88P 88888888 888        888   888  Y88b  
+ 888   Y88b  888  888 888     888  d8888888888  Y8bd8P  Y8b.     Y88b.      888   888   Y88b  
+ 888    Y88b "Y888888 888     888 d88P     888   Y88P    "Y8888   "Y8888P 8888888 888    Y88b
+                                                                                             
+                                                                                             
+https://github.com/KarlAvec1K"
 
 # Start script
 echo "[👶] Starting up..."
 
+# Function to generate SSH key
+generate_ssh_key() {
+    SSH_DIR="$HOME/.ssh"
+    SSH_KEY="$SSH_DIR/id_rsa"
+
+    if [ ! -f "$SSH_KEY" ]; then
+        echo "[🔑] SSH key not found. Generating a new SSH key pair..."
+        mkdir -p "$SSH_DIR"
+        ssh-keygen -t rsa -b 4096 -C "your_email@example.com" -f "$SSH_KEY" -N ""
+        echo "[🔑] SSH key generated."
+        echo "[🔑] Public key:"
+        cat "${SSH_KEY}.pub"
+    else
+        echo "[🔑] SSH key already exists."
+        echo "[🔑] Public key:"
+        cat "${SSH_KEY}.pub"
+    fi
+}
+
+# Generate SSH key
+generate_ssh_key
+
+# Download ISO using aria2 with Cloudflare
+echo "[📥] Downloading ISO from $ISO_URL..."
+aria2c --continue=true --max-connection-per-server=4 --split=4 --header='User-Agent: Mozilla/5.0' "$ISO_URL" -o "$ISO_NAME" &
+spinner
+
 # Create working directory
 echo "[🔧] Creating working directory..."
 mkdir -p "$WORK_DIR"
-sudo mount -o loop "$DOWNLOAD_DIR/$ISO_NAME" "$ISO_MOUNT"
+sudo mount -o loop "$ISO_NAME" "$ISO_MOUNT"
 rsync -a "$ISO_MOUNT/" "$WORK_DIR/"
 sudo umount "$ISO_MOUNT"
 
