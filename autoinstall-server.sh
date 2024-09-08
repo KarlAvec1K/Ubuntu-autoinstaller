@@ -73,7 +73,9 @@ echo " 888  Y88b   .d888888 888     888   d88P   888 Y88  88P 88888888 888      
 echo " 888   Y88b  888  888 888     888  d8888888888  Y8bd8P  Y8b.     Y88b.      888   888   Y88b"
 echo " 888    Y88b \"Y888888 888     888 d88P     888   Y88P    \"Y8888   \"Y8888P 8888888 888    Y88b"
 echo "                                                                                              "
-echo " https://github.com/KarlAvec1K                    "
+echo "                                 https://github.com/KarlAvec1K                                "
+echo "                                                                                              "
+
 
 # Download ISO
 echo "[📥] Downloading ISO from $ISO_URL..."
