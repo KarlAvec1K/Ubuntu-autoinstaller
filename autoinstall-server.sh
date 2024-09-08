@@ -19,6 +19,15 @@ EOF
 # Start script
 echo "[👶] Starting up..."
 
+# Variables
+ISO_URL="https://cdimage.ubuntu.com/ubuntu-server/focal/daily-live/current/focal-live-server-amd64+intel-iot.iso"
+ISO_NAME="focal-live-server-amd64+intel-iot.iso"
+WORK_DIR="/mnt/ubuntu-autoinstall-work"
+ISO_MOUNT="/mnt/iso"
+MODIFIED_ISO="modified-ubuntu.iso"
+USB_DEVICE=""
+#DOWNLOAD_DIR="/path/to/downloads" # Not needed anymore
+
 # Function to generate SSH key
 generate_ssh_key() {
     SSH_DIR="$HOME/.ssh"
@@ -27,7 +36,7 @@ generate_ssh_key() {
     if [ ! -f "$SSH_KEY" ]; then
         echo "[🔑] SSH key not found. Generating a new SSH key pair..."
         mkdir -p "$SSH_DIR"
-        ssh-keygen -t rsa -b 4096 -C "your_email@example.com" -f "$SSH_KEY" -N ""
+        ssh-keygen -t rsa -b 4096 -C "$USER_EMAIL" -f "$SSH_KEY" -N ""
         echo "[🔑] SSH key generated."
         echo "[🔑] Public key:"
         cat "${SSH_KEY}.pub"
@@ -38,36 +47,75 @@ generate_ssh_key() {
     fi
 }
 
-# Generate SSH key
-generate_ssh_key
+# Spinner function
+spinner() {
+    local pid=$!
+    local delay=0.1
+    local spinstr='|/-\'
+    while ps -p $pid >/dev/null; do
+        local temp=${spinstr#?}
+        printf "[%c]  " "$spinstr"
+        spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b\b"
+    done
+    printf "Done.\n"
+}
 
-# Download ISO using aria2 with Cloudflare
-echo "[📥] Downloading ISO from $ISO_URL..."
-aria2c --continue=true --max-connection-per-server=4 --split=4 --header='User-Agent: Mozilla/5.0' "$ISO_URL" -o "$ISO_NAME" &
-spinner
+# Function to list and select USB device
+select_usb_device() {
+    echo "[🔍] Available USB devices:"
+    lsblk -o NAME,SIZE,MOUNTPOINT | grep -e '^sd'
+    echo
+    echo -n "Enter the device name (e.g., sdb) to use for writing the ISO: "
+    read -r USB_DEVICE_NAME
+    USB_DEVICE="/dev/$USB_DEVICE_NAME"
+    
+    if [ ! -b "$USB_DEVICE" ]; then
+        echo "[❗] Invalid device. Please run the script again and provide a valid device name."
+        exit 1
+    fi
+}
+
+# Get autoinstall configuration details
+get_autoinstall_details() {
+    echo "[📝] Please enter the following details for autoinstall configuration:"
+    echo -n "Username: "
+    read -r USERNAME
+    echo -n "Password: "
+    read -s PASSWORD
+    echo
+    echo -n "Hostname: "
+    read -r HOSTNAME
+    echo -n "SSH Public Key: "
+    read -r SSH_KEY
+}
+
+# Generate SSH key if needed
+echo -n "Enter your email address for SSH key generation: "
+read -r USER_EMAIL
+generate_ssh_key
 
 # Create working directory
 echo "[🔧] Creating working directory..."
 mkdir -p "$WORK_DIR"
-sudo mount -o loop "$ISO_NAME" "$ISO_MOUNT"
+
+# Download ISO using aria2 with Cloudflare
+echo "[📥] Downloading ISO from $ISO_URL..."
+aria2c --continue=true --max-connection-per-server=4 --split=4 --header='User-Agent: Mozilla/5.0' "$ISO_URL" -o "$WORK_DIR/$ISO_NAME" &
+spinner
+
+# Mount ISO and copy files
+echo "[🔧] Mounting ISO and copying files..."
+sudo mount -o loop "$WORK_DIR/$ISO_NAME" "$ISO_MOUNT"
 rsync -a "$ISO_MOUNT/" "$WORK_DIR/"
 sudo umount "$ISO_MOUNT"
 
-# Get autoinstall configuration details
-echo "[📝] Please enter the following details for autoinstall configuration:"
-echo -n "Username: "
-read -r USERNAME
-echo -n "Password: "
-read -s PASSWORD
-echo
-echo -n "Hostname: "
-read -r HOSTNAME
-echo -n "SSH Public Key: "
-read -r SSH_KEY
-create_user_data
+# Get autoinstall details
+get_autoinstall_details
 
-# Get USB device
-get_usb_device
+# Select USB device
+select_usb_device
 
 # Modify ISO
 echo "[🛠️] Modifying ISO..."
@@ -75,12 +123,12 @@ echo "[🛠️] Modifying ISO..."
 
 # Create modified ISO
 echo "[💾] Creating modified ISO..."
-mkisofs -r -V "Custom Ubuntu ISO" -cache-inodes -J -l -o "$MODIFIED_ISO" "$WORK_DIR" &
+mkisofs -r -V "Custom Ubuntu ISO" -cache-inodes -J -l -o "$WORK_DIR/$MODIFIED_ISO" "$WORK_DIR" &
 spinner
 
 # Write modified ISO to USB
 echo "[💿] Writing ISO to USB device $USB_DEVICE..."
-sudo dd if="$MODIFIED_ISO" of="$USB_DEVICE" bs=4M status=progress && sync
+sudo dd if="$WORK_DIR/$MODIFIED_ISO" of="$USB_DEVICE" bs=4M status=progress && sync
 
 # Cleanup
 echo "[❓] Do you want to delete the working directory '$WORK_DIR'? [y/n]: "
