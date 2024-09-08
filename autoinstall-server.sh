@@ -31,22 +31,20 @@ spinner() {
 
 # Function to create user-data
 create_user_data() {
-    cat <<EOF > "$WORK_DIR/user-data"
-#cloud-config
-autoinstall:
-  version: 1
-  ssh:
-    install-server: yes
-    authorized-keys:
-      - $SSH_KEY
-  packages:
-    - vim
-    - htop
-  user-data:
-    username: $USERNAME
-    password: $PASSWORD
-    hostname: $HOSTNAME
-EOF
+    echo "#cloud-config" > "$WORK_DIR/user-data"
+    echo "autoinstall:" >> "$WORK_DIR/user-data"
+    echo "  version: 1" >> "$WORK_DIR/user-data"
+    echo "  ssh:" >> "$WORK_DIR/user-data"
+    echo "    install-server: yes" >> "$WORK_DIR/user-data"
+    echo "    authorized-keys:" >> "$WORK_DIR/user-data"
+    echo "      - $SSH_KEY" >> "$WORK_DIR/user-data"
+    echo "  packages:" >> "$WORK_DIR/user-data"
+    echo "    - vim" >> "$WORK_DIR/user-data"
+    echo "    - htop" >> "$WORK_DIR/user-data"
+    echo "  user-data:" >> "$WORK_DIR/user-data"
+    echo "    username: $USERNAME" >> "$WORK_DIR/user-data"
+    echo "    password: $PASSWORD" >> "$WORK_DIR/user-data"
+    echo "    hostname: $HOSTNAME" >> "$WORK_DIR/user-data"
 }
 
 # Function to get USB device
@@ -66,19 +64,16 @@ get_usb_device() {
 echo "[👶] Starting up..."
 
 # Display ASCII logo
-cat <<'EOF'
- 888    d8P                   888        d8888                             d888   888    d8P  
- 888   d8P                    888       d88888                            d8888   888   d8P   
- 888  d8P                     888      d88P888                              888   888  d8P    
- 888d88K      8888b.  888d888 888     d88P 888 888  888  .d88b.   .d8888b   888   888d88K     
- 8888888b        88b 888P"   888    d88P  888 888  888 d8P  Y8b d88P"      888   8888888b    
- 888  Y88b   .d888888 888     888   d88P   888 Y88  88P 88888888 888        888   888  Y88b   
- 888   Y88b  888  888 888     888  d8888888888  Y8bd8P  Y8b.     Y88b.      888   888   Y88b  
- 888    Y88b "Y888888 888     888 d88P     888   Y88P    "Y8888   "Y8888P 8888888 888    Y88b 
-                                                                                             
-                                                                                             
-https://github.com/KarlAvec1K
-EOF
+echo " 888    d8P                   888        d8888                             d888   888    d8P  "
+echo " 888   d8P                    888       d88888                            d8888   888   d8P  "
+echo " 888  d8P                     888      d88P888                              888   888  d8P   "
+echo " 888d88K      8888b.  888d888 888     d88P 888 888  888  .d88b.   .d8888b   888   888d88K  "
+echo " 8888888b        88b 888P\"   888    d88P  888 888  888 d8P  Y8b d88P\"      888   8888888b "
+echo " 888  Y88b   .d888888 888     888   d88P   888 Y88  88P 88888888 888        888   888  Y88b"
+echo " 888   Y88b  888  888 888     888  d8888888888  Y8bd8P  Y8b.     Y88b.      888   888   Y88b"
+echo " 888    Y88b \"Y888888 888     888 d88P     888   Y88P    \"Y8888   \"Y8888P 8888888 888    Y88b"
+echo "                                                                                              "
+echo " https://github.com/KarlAvec1K                    "
 
 # Download ISO
 echo "[📥] Downloading ISO from $ISO_URL..."
